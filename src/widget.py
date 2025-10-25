@@ -1,6 +1,6 @@
 from src.mask import get_mask_card_number
 
-def mask_account_card(account_card):
+def mask_account_card(account_card: str) -> str:
     """Функция принимает один аргумент — строку,
     содержащую тип и номер карты или счета
     и возвращает строку с замаскированным номером"""
@@ -25,7 +25,7 @@ def mask_account_card(account_card):
         return result  # Возвращаем результат, а не вызываем функцию
 
 
-def get_date(date):
+def get_date(date: str) -> str:
     """Функция которая, принимает на вход строку
     с датой и возвращает строку с датой в формате ("ДД.ММ.ГГГГ" "11.03.2024")"""
     #"2024-03-11T02:26:18.671407"
