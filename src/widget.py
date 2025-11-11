@@ -1,5 +1,6 @@
 from src.mask import get_mask_card_number
 
+
 def mask_account_card(account_card: str) -> str:
     """Функция принимает один аргумент — строку,
     содержащую тип и номер карты или счета
@@ -28,12 +29,10 @@ def mask_account_card(account_card: str) -> str:
 def get_date(date: str) -> str:
     """Функция которая, принимает на вход строку
     с датой и возвращает строку с датой в формате ("ДД.ММ.ГГГГ" "11.03.2024")"""
-    #"2024-03-11T02:26:18.671407"
+    # "2024-03-11T02:26:18.671407"
     days = date[8:10]
     month = date[5:7]
     year = date[0:4]
     new_date = ".".join([days, month, year])
 
     return new_date
-
-
