@@ -92,6 +92,20 @@ pycodestyle = ">=2.14.0,<2.15.0"
 pyflakes = ">=3.4.0,<3.5.0"
 
 [[package]]
+name = "generators"
+version = "2020.4.27"
+description = "a high performance pipeline processor written in python"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "generators-2020.4.27.tar.gz", hash = "sha256:fdf7912a89ef7818897c0666f9fb87caa264e4066c65bc1b6b0fca330a05311f"},
+]
+
+[package.dependencies]
+strict_functions = "*"
+
+[[package]]
 name = "isort"
 version = "7.0.0"
 description = "A Python utility / library to sort Python imports."
@@ -272,6 +286,17 @@ files = [
 dev = ["black", "build", "mypy", "pytest", "pytest-cov", "setuptools", "tox", "twine", "wheel"]
 
 [[package]]
+name = "strict-functions"
+version = "2020.2.4"
+description = "Decorators for function scope control, overloading, type safety, thread safety, cache control, tracing and even self awareness!"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "strict_functions-2020.2.4.tar.gz", hash = "sha256:c1f22784e77151bbc808f31bb5df0d5cfbc37d329b5f3aa94db10abb169e37fe"},
+]
+
+[[package]]
 name = "typing-extensions"
 version = "4.15.0"
 description = "Backported and Experimental Type Hints for Python 3.9+"
@@ -286,4 +311,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13"
-content-hash = "43c15d4b40e26b9dc4090308565270876da3b72ef2b9fa0bddbe4b344cfe177c"
+content-hash = "d5e4320d131cb783d3ec4366d28fadbf26d3d0e869fc7e41326e77cf37e88aeb"

@@ -8,6 +8,7 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "generators (>=2020.4.27,<2021.0.0)"
 ]
 
 

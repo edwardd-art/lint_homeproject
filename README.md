@@ -59,3 +59,27 @@ tests/test_mask.py - тесты функций форматирования ка
 2. Параметризацию для множества тест-кейсов
 
 3. Assert для проверки результатов
+
+## Модуль generators
+
+Модуль содержит генераторы для обработки финансовых данных.
+
+### Примеры использования:
+
+```python
+from generators import filter_by_currency, transaction_descriptions, card_number_generator
+
+# Фильтрация транзакций по валюте
+usd_transactions = filter_by_currency(transactions, "USD")
+for transaction in usd_transactions:
+    print(f"{transaction['date']} - {transaction['operationAmount']['amount']} USD")
+
+# Получение описаний транзакций
+descriptions = transaction_descriptions(transactions)
+for description in descriptions:
+    print(description)
+
+# Генерация номеров карт
+card_generator = card_number_generator(1, 10)
+for card_number in card_generator:
+    print(card_number)
