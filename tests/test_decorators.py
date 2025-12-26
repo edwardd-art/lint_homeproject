@@ -1,7 +1,7 @@
 import pytest
 import tempfile
 import os
-from decorators import log
+from src.decorators import log
 
 
 # Тестовая функция для декорирования

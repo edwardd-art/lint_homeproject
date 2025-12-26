@@ -83,3 +83,22 @@ for description in descriptions:
 card_generator = card_number_generator(1, 10)
 for card_number in card_generator:
     print(card_number)
+
+# Обработка финансовых транзакций с конвертацией валют
+
+Проект для обработки финансовых транзакций, полученных из JSON-файлов, с возможностью конвертации валют через внешнее API.
+
+## 📋 Функциональность
+
+- 📁 Чтение транзакций из JSON-файлов
+- 💱 Конвертация сумм транзакций в рубли (RUB)
+- 🌐 Интеграция с внешним API курсов валют (Exchange Rates Data API)
+- 📝 Логирование операций с помощью декоратора `log`
+- 🧪 Покрытие тестами с использованием `mock` и `patch`
+- ✅ Типизация кода с `mypy`
+
+## 🚀 Установка и настройка
+
+### 1. Клонирование репозитория
+```bash
+git clone https://github.com/edwardd-art/lint_homeproject/tree/develop
