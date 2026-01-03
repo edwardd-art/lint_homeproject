@@ -16,10 +16,12 @@ def read_json_file(file_path: str) -> List[Dict[str, Any]]:
     try:
         # Проверяем существование файла
         if not os.path.exists(file_path):
+            print(f"Файл {file_path} не найден")
             return []
 
         # Проверяем, не пустой ли файл
         if os.path.getsize(file_path) == 0:
+            print(f"Файл {file_path} пустой")
             return []
 
         # Открываем и читаем файл
@@ -28,11 +30,17 @@ def read_json_file(file_path: str) -> List[Dict[str, Any]]:
 
         # Проверяем, что данные - список
         if not isinstance(data, list):
+            print(f"Файл {file_path} должен содержать список")
             return []
 
         return data
 
-    except json.JSONDecodeError:
+    except FileNotFoundError:
+        print(f"Файл {file_path} не найден (FileNotFoundError)")
         return []
-    except Exception:
+    except json.JSONDecodeError as e:
+        print(f"Ошибка декодирования JSON в файле {file_path}: {e}")
+        return []
+    except Exception as e:
+        print(f"Неожиданная ошибка при чтении файла {file_path}: {e}")
         return []

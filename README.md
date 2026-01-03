@@ -101,4 +101,5 @@ for card_number in card_generator:
 
 ### 1. Клонирование репозитория
 ```bash
-git clone https://github.com/edwardd-art/lint_homeproject/tree/develop
+git clone https://github.com/edwardd-art/lint_homeproject.git
+

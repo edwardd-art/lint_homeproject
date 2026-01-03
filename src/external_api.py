@@ -33,9 +33,14 @@ class ExchangeRateAPI:
             to_currency: Целевая валюта (по умолчанию RUB)
 
         Returns:
-            Курс обмена или None в случае ошибки
+            Курс обмена как float или None в случае ошибки
         """
-        if from_currency.upper() == "RUB":
+        # Приводим валюту к верхнему регистру
+        from_currency = from_currency.upper()
+        to_currency = to_currency.upper()
+
+        # Если валюта уже рубли
+        if from_currency == "RUB":
             return 1.0
 
         try:
@@ -47,19 +52,33 @@ class ExchangeRateAPI:
             }
 
             response = requests.get(url, headers=headers, params=params, timeout=10)
-            response.raise_for_status()
+            response.raise_for_status()  # Проверяем статус ответа
 
             data = response.json()
-            rate = data.get("rates", {}).get(to_currency)
 
-            if rate is None:
+            # Проверяем структуру ответа
+            if not data.get("success", True):
+                print(f"API вернуло ошибку: {data.get('error', 'Unknown error')}")
                 return None
 
+            rates = data.get("rates", {})
+            if not rates:
+                print(f"Курсы валют не найдены в ответе API")
+                return None
+
+            rate = rates.get(to_currency)
+            if rate is None:
+                print(f"Курс {from_currency} -> {to_currency} не найден")
+                return None
+
+            # Преобразуем в float
             return float(rate)
 
-        except requests.exceptions.RequestException:
+        except requests.exceptions.RequestException as e:
+            print(f"Ошибка при запросе к API: {e}")
             return None
-        except (KeyError, ValueError):
+        except (KeyError, ValueError, TypeError) as e:
+            print(f"Ошибка обработки ответа API: {e}")
             return None
 
 
@@ -71,29 +90,59 @@ def convert_amount_to_rub(transaction: Dict[str, Any]) -> Optional[float]:
         transaction: Словарь с данными транзакции
 
     Returns:
-        Сумма в рублях или None в случае ошибки
+        Сумма в рублях как float или None в случае ошибки
     """
     try:
         # Проверяем обязательные поля
-        if "amount" not in transaction or "currency" not in transaction:
+        if "amount" not in transaction:
+            print("Транзакция не содержит поле 'amount'")
             return None
 
-        amount = float(transaction["amount"])
-        currency = transaction["currency"].upper()
+        if "currency" not in transaction:
+            print("Транзакция не содержит поле 'currency'")
+            return None
+
+        # Получаем сумму и валюту
+        amount_str = transaction["amount"]
+        currency_str = transaction["currency"]
+
+        # Преобразуем сумму в float
+        try:
+            amount = float(amount_str)
+        except (ValueError, TypeError):
+            print(f"Некорректное значение суммы: {amount_str}")
+            return None
+
+        # Приводим валюту к верхнему регистру
+        currency = str(currency_str).upper()
 
         # Если валюта уже рубли
         if currency == "RUB":
-            return amount
+            return float(amount)
 
-        # Для других валют получаем курс
-        api = ExchangeRateAPI()
-        rate = api.get_exchange_rate(currency)
-
-        if rate is None:
+        # Проверяем поддерживаемые валюты
+        supported_currencies = ["USD", "EUR", "GBP", "CNY", "JPY"]
+        if currency not in supported_currencies:
+            print(f"Неподдерживаемая валюта: {currency}")
             return None
 
-        # Конвертируем
-        return amount * rate
+        # Для других валют получаем курс через API
+        try:
+            api = ExchangeRateAPI()
+            rate = api.get_exchange_rate(currency)
 
-    except (ValueError, TypeError):
+            if rate is None:
+                print(f"Не удалось получить курс для {currency}")
+                return None
+
+            # Конвертируем и возвращаем как float
+            result = amount * rate
+            return float(result)
+
+        except ValueError as e:
+            print(f"Ошибка инициализации API: {e}")
+            return None
+
+    except Exception as e:
+        print(f"Неожиданная ошибка при конвертации: {e}")
         return None
