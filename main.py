@@ -1,5 +1,5 @@
 ﻿#!/usr/bin/env python3
-"""Основной файл для тестирования проекта"""
+"""Основной скрипт для работы с реальными данными"""
 
 import os
 from src import read_json_file, convert_amount_to_rub
@@ -9,35 +9,34 @@ def main():
     # Читаем транзакции
     file_path = os.path.join("data", "operations.json")
     transactions = read_json_file(file_path)
-    
+
     print(f"Загружено транзакций: {len(transactions)}")
-    print("=" * 50)
-    
-    # Конвертируем каждую транзакцию
-    total_rub = 0.0
-    
-    for i, transaction in enumerate(transactions, 1):
+    print("=" * 60)
+
+    # Обрабатываем первые 5 транзакций для примера
+    for i, transaction in enumerate(transactions[:5], 1):
+        print(f"\nТранзакция #{i}:")
+        print(f"  ID: {transaction.get('id', 'N/A')}")
+        print(f"  Описание: {transaction.get('description', 'N/A')}")
+
+        operation_amount = transaction.get("operationAmount", {})
+        amount = operation_amount.get("amount", "N/A")
+        currency_info = operation_amount.get("currency", {})
+        currency_name = currency_info.get("name", "N/A")
+        currency_code = currency_info.get("code", "N/A")
+
+        print(f"  Сумма: {amount} {currency_name} ({currency_code})")
+
+        # Конвертируем
         amount_rub = convert_amount_to_rub(transaction)
-        
+
         if amount_rub is not None:
-            print(f"Транзакция #{transaction.get('id', i)}")
-            print(f"  Описание: {transaction.get('description', 'N/A')}")
-            print(f"  Сумма: {transaction.get('amount')} {transaction.get('currency')}")
             print(f"  В рублях: {amount_rub:.2f} RUB")
-            total_rub += amount_rub
         else:
-            print(f"Транзакция #{i}: Ошибка конвертации")
-        
-        print("-" * 30)
-    
-    print(f"\nОбщая сумма в рублях: {total_rub:.2f} RUB")
-    
-    # Проверка API ключа
-    api_key = os.getenv("API_KEY")
-    if api_key and api_key != "your_api_key_here":
-        print(f"\n✅ API ключ загружен (первые 5 символов: {api_key[:5]}...)")
-    else:
-        print("\n⚠️  Проверьте файл .env")
+            print("  ❌ Ошибка конвертации")
+
+    print("\n" + "=" * 60)
+    print("✅ Обработка завершена")
 
 
 if __name__ == "__main__":

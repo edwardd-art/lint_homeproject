@@ -33,7 +33,10 @@ def read_json_file(file_path: str) -> List[Dict[str, Any]]:
             print(f"Файл {file_path} должен содержать список")
             return []
 
-        return data
+        # Фильтруем пустые словари (если есть)
+        valid_transactions = [item for item in data if isinstance(item, dict) and item]
+
+        return valid_transactions
 
     except FileNotFoundError:
         print(f"Файл {file_path} не найден (FileNotFoundError)")

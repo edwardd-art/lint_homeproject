@@ -20,35 +20,38 @@ class ExchangeRateAPI:
         if not self.api_key:
             raise ValueError("API_KEY не найден в переменных окружения")
 
-    def get_exchange_rate(
+    def convert_currency(
             self,
+            amount: float,
             from_currency: str,
             to_currency: str = "RUB"
     ) -> Optional[float]:
         """
-        Получает курс валюты к рублю.
+        Конвертирует сумму из одной валюты в другую.
 
         Args:
-            from_currency: Исходная валюта (USD, EUR)
+            amount: Сумма для конвертации
+            from_currency: Исходная валюта (USD, EUR и т.д.)
             to_currency: Целевая валюта (по умолчанию RUB)
 
         Returns:
-            Курс обмена как float или None в случае ошибки
+            Конвертированная сумма как float или None в случае ошибки
         """
-        # Приводим валюту к верхнему регистру
+        # Приводим валюты к верхнему регистру
         from_currency = from_currency.upper()
         to_currency = to_currency.upper()
 
         # Если валюта уже рубли
         if from_currency == "RUB":
-            return 1.0
+            return amount
 
         try:
-            url = f"{self.base_url}/latest"
+            url = f"{self.base_url}/convert"
             headers = {"apikey": self.api_key}
             params = {
-                "base": from_currency,
-                "symbols": to_currency
+                "from": from_currency,
+                "to": to_currency,
+                "amount": amount
             }
 
             response = requests.get(url, headers=headers, params=params, timeout=10)
@@ -56,23 +59,18 @@ class ExchangeRateAPI:
 
             data = response.json()
 
-            # Проверяем структуру ответа
-            if not data.get("success", True):
-                print(f"API вернуло ошибку: {data.get('error', 'Unknown error')}")
+            # Проверяем успешность запроса
+            if not data.get("success", False):
+                print(f"API вернуло ошибку: {data.get('error', {}).get('info', 'Unknown error')}")
                 return None
 
-            rates = data.get("rates", {})
-            if not rates:
-                print(f"Курсы валют не найдены в ответе API")
+            # Получаем результат конвертации
+            result = data.get("result")
+            if result is None:
+                print("Результат конвертации не найден в ответе API")
                 return None
 
-            rate = rates.get(to_currency)
-            if rate is None:
-                print(f"Курс {from_currency} -> {to_currency} не найден")
-                return None
-
-            # Преобразуем в float
-            return float(rate)
+            return float(result)
 
         except requests.exceptions.RequestException as e:
             print(f"Ошибка при запросе к API: {e}")
@@ -87,24 +85,38 @@ def convert_amount_to_rub(transaction: Dict[str, Any]) -> Optional[float]:
     Конвертирует сумму транзакции в рубли.
 
     Args:
-        transaction: Словарь с данными транзакции
+        transaction: Словарь с данными транзакции из operations.json
 
     Returns:
         Сумма в рублях как float или None в случае ошибки
     """
     try:
-        # Проверяем обязательные поля
-        if "amount" not in transaction:
+        # Проверяем структуру транзакции
+        if "operationAmount" not in transaction:
+            print("Транзакция не содержит поле 'operationAmount'")
+            return None
+
+        operation_amount = transaction["operationAmount"]
+
+        # Получаем сумму
+        if "amount" not in operation_amount:
             print("Транзакция не содержит поле 'amount'")
             return None
 
-        if "currency" not in transaction:
+        # Получаем валюту
+        if "currency" not in operation_amount:
             print("Транзакция не содержит поле 'currency'")
             return None
 
-        # Получаем сумму и валюту
-        amount_str = transaction["amount"]
-        currency_str = transaction["currency"]
+        currency_info = operation_amount["currency"]
+
+        if "code" not in currency_info:
+            print("Информация о валюте не содержит поле 'code'")
+            return None
+
+        # Получаем сумму и код валюты
+        amount_str = operation_amount["amount"]
+        currency_code = currency_info["code"]
 
         # Преобразуем сумму в float
         try:
@@ -113,31 +125,19 @@ def convert_amount_to_rub(transaction: Dict[str, Any]) -> Optional[float]:
             print(f"Некорректное значение суммы: {amount_str}")
             return None
 
-        # Приводим валюту к верхнему регистру
-        currency = str(currency_str).upper()
+        # Приводим код валюты к верхнему регистру
+        currency = str(currency_code).upper()
 
         # Если валюта уже рубли
         if currency == "RUB":
             return float(amount)
 
-        # Проверяем поддерживаемые валюты
-        supported_currencies = ["USD", "EUR", "GBP", "CNY", "JPY"]
-        if currency not in supported_currencies:
-            print(f"Неподдерживаемая валюта: {currency}")
-            return None
-
-        # Для других валют получаем курс через API
+        # Для других валют конвертируем через API
         try:
             api = ExchangeRateAPI()
-            rate = api.get_exchange_rate(currency)
+            converted_amount = api.convert_currency(amount, currency, "RUB")
 
-            if rate is None:
-                print(f"Не удалось получить курс для {currency}")
-                return None
-
-            # Конвертируем и возвращаем как float
-            result = amount * rate
-            return float(result)
+            return converted_amount
 
         except ValueError as e:
             print(f"Ошибка инициализации API: {e}")
