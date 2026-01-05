@@ -1,11 +1,10 @@
+from generators import filter_by_currency, transaction_descriptions, card_number_generator
 import sys
 import os
 import pytest
 
 # Добавляем папку src в путь для импорта
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../src'))
-
-from generators import filter_by_currency, transaction_descriptions, card_number_generator
 
 
 @pytest.fixture

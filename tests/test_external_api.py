@@ -1,182 +1,304 @@
-﻿import pytest
+﻿"""Тесты для модуля external_api."""
+import pytest
 import os
-from unittest.mock import patch, Mock, MagicMock
+import requests
+from unittest.mock import Mock, patch
 from src.external_api import ExchangeRateAPI, convert_amount_to_rub
 
 
-# Фикстура для API ключа
+# Фикстура для автоматической установки API ключа
 @pytest.fixture(autouse=True)
-def set_api_key():
-    os.environ["API_KEY"] = "test_key"
+def setup_env():
+    """Автоматическая установка переменных окружения для тестов."""
+    os.environ["API_KEY"] = "test_key_123"
     yield
+    # Очистка после теста
+    if "API_KEY" in os.environ:
+        del os.environ["API_KEY"]
 
 
-# Исправленный тест с patch декоратором
-@patch('src.external_api.requests.get')
-def test_patch_decorator_demo(mock_get):
-    """Демонстрация использования декоратора @patch"""
-    # Настраиваем мок
-    mock_response = Mock()
-    mock_response.json.return_value = {"rates": {"RUB": 75.5}}
-    mock_get.return_value = mock_response
+# ТЕСТЫ ДЛЯ convert_amount_to_rub
+def test_convert_rub():
+    """Тест конвертации рублей."""
+    transaction = {
+        "operationAmount": {
+            "amount": "1000.50",
+            "currency": {
+                "code": "RUB"
+            }
+        }
+    }
+    result = convert_amount_to_rub(transaction)
+    assert result == 1000.50
+    assert isinstance(result, float)
 
-    # Вызываем тестируемую функцию
-    api = ExchangeRateAPI()
-    result = api.get_exchange_rate("USD")
+
+def test_convert_invalid_amount():
+    """Тест с некорректной суммой."""
+    transaction = {
+        "operationAmount": {
+            "amount": "not_a_number",
+            "currency": {
+                "code": "RUB"
+            }
+        }
+    }
+    result = convert_amount_to_rub(transaction)
+    assert result is None
+
+
+def test_convert_missing_operation_amount():
+    """Тест без operationAmount."""
+    transaction = {"id": 1}
+    result = convert_amount_to_rub(transaction)
+    assert result is None
+
+
+def test_convert_missing_amount():
+    """Тест без amount."""
+    transaction = {
+        "operationAmount": {
+            "currency": {"code": "RUB"}
+        }
+    }
+    result = convert_amount_to_rub(transaction)
+    assert result is None
+
+
+def test_convert_missing_currency():
+    """Тест без currency."""
+    transaction = {
+        "operationAmount": {
+            "amount": "100"
+        }
+    }
+    result = convert_amount_to_rub(transaction)
+    assert result is None
+
+
+def test_convert_missing_currency_code():
+    """Тест без code в currency."""
+    transaction = {
+        "operationAmount": {
+            "amount": "100",
+            "currency": {"name": "руб."}
+        }
+    }
+    result = convert_amount_to_rub(transaction)
+    assert result is None
+
+
+# ТЕСТЫ С MOCK И PATCH
+@patch('src.external_api.ExchangeRateAPI')
+def test_convert_usd_with_mock(MockAPI):
+    """Тест конвертации USD с использованием mock и patch."""
+    # Настраиваем mock
+    mock_instance = Mock()
+    mock_instance.convert_currency.return_value = 7500.00
+    MockAPI.return_value = mock_instance
+
+    transaction = {
+        "operationAmount": {
+            "amount": "100.00",
+            "currency": {
+                "code": "USD"
+            }
+        }
+    }
+
+    result = convert_amount_to_rub(transaction)
 
     # Проверяем результат
-    assert result == 75.5
+    assert result == 7500.00
+    assert isinstance(result, float)
 
-    # Проверяем что мок был вызван с правильными параметрами
-    mock_get.assert_called_once()
-
-    # ИЛИ просто проверяем что был вызов (упрощённо)
-    assert mock_get.called
+    # Проверяем что mock был использован правильно
+    MockAPI.assert_called_once()
+    mock_instance.convert_currency.assert_called_once_with(100.00, "USD", "RUB")
 
 
-# Исправленный тест с side_effect
-@patch('src.external_api.requests.get')
-def test_mock_side_effect_exception(mock_get):
-    """Демонстрация side_effect для исключений"""
-    # Настраиваем side_effect для вызова исключения
-    mock_get.side_effect = ConnectionError("Нет соединения с интернетом")
+@patch('src.external_api.ExchangeRateAPI')
+def test_convert_eur_with_mock(MockAPI):
+    """Тест конвертации EUR с использованием mock и patch."""
+    mock_instance = Mock()
+    mock_instance.convert_currency.return_value = 9000.00
+    MockAPI.return_value = mock_instance
 
-    api = ExchangeRateAPI()
-    result = api.get_exchange_rate("USD")
+    transaction = {
+        "operationAmount": {
+            "amount": "100.00",
+            "currency": {
+                "code": "EUR"
+            }
+        }
+    }
 
-    # Функция должна вернуть None при ошибке
+    result = convert_amount_to_rub(transaction)
+
+    assert result == 9000.00
+    MockAPI.assert_called_once()
+    mock_instance.convert_currency.assert_called_once_with(100.00, "EUR", "RUB")
+
+
+@patch('src.external_api.ExchangeRateAPI')
+def test_convert_api_returns_none(MockAPI):
+    """Тест когда API возвращает None."""
+    mock_instance = Mock()
+    mock_instance.convert_currency.return_value = None
+    MockAPI.return_value = mock_instance
+
+    transaction = {
+        "operationAmount": {
+            "amount": "100.00",
+            "currency": {
+                "code": "USD"
+            }
+        }
+    }
+
+    result = convert_amount_to_rub(transaction)
+
     assert result is None
-    # Проверяем что функция попыталась сделать запрос
+    MockAPI.assert_called_once()
+    mock_instance.convert_currency.assert_called_once_with(100.00, "USD", "RUB")
+
+
+# ТЕСТЫ ДЛЯ ExchangeRateAPI
+def test_exchange_api_init_no_key():
+    """Тест инициализации без ключа."""
+    # Сохраняем и удаляем ключ
+    original_key = os.environ.get("API_KEY")
+    if "API_KEY" in os.environ:
+        del os.environ["API_KEY"]
+
+    try:
+        with pytest.raises(ValueError, match="API_KEY не найден"):
+            ExchangeRateAPI()
+    finally:
+        # Восстанавливаем ключ
+        if original_key:
+            os.environ["API_KEY"] = original_key
+
+
+def test_exchange_api_rub_conversion():
+    """Тест что RUB возвращает ту же сумму."""
+    api = ExchangeRateAPI()
+    result = api.convert_currency(100.0, "RUB")
+    assert result == 100.0
+
+
+@patch('src.external_api.requests.get')
+def test_exchange_api_success(mock_get):
+    """Тест успешного вызова API."""
+    # Настраиваем mock ответ
+    mock_response = Mock()
+    mock_response.json.return_value = {
+        "success": True,
+        "result": 7500.00
+    }
+    mock_response.raise_for_status.return_value = None
+    mock_get.return_value = mock_response
+
+    api = ExchangeRateAPI()
+    result = api.convert_currency(100.0, "USD", "RUB")
+
+    assert result == 7500.00
     mock_get.assert_called_once()
 
 
-# Исправленный тест с patch.object
-def test_patch_object_demo():
-    """Демонстрация использования patch.object"""
-    # Создаем реальный объект
+@patch('src.external_api.requests.get')
+def test_exchange_api_error(mock_get):
+    """Тест ошибки API с использованием mock."""
+    # Используем RequestException, которое обрабатывает ваш код
+    mock_get.side_effect = requests.exceptions.RequestException("API error")
+
     api = ExchangeRateAPI()
 
-    # Патчим метод get_exchange_rate у КЛАССА ExchangeRateAPI
-    with patch.object(ExchangeRateAPI, 'get_exchange_rate') as mock_method:
-        mock_method.return_value = 100.0
+    # Ваш метод должен вернуть None
+    result = api.convert_currency(100.0, "USD", "RUB")
 
-        # Вызываем метод
-        result = api.get_exchange_rate("USD")
+    # Проверяем что вернулось None
+    assert result is None
 
-        assert result == 100.0
-        mock_method.assert_called_once_with("USD", "RUB")
-# Альтернативный тест patch.object - правильный
+    # Проверяем что requests.get был вызван
+    mock_get.assert_called_once()
 
 
-def test_patch_object_correct():
-    """Правильное использование patch.object"""
-    os.environ["API_KEY"] = "test_key"
-
-    with patch.object(ExchangeRateAPI, 'get_exchange_rate') as mock_method:
-        mock_method.return_value = 50.0
-
-        # Теперь ВСЕ объекты ExchangeRateAPI будут использовать мок
-        api = ExchangeRateAPI()
-        result = api.get_exchange_rate("EUR")
-
-        assert result == 50.0
-        mock_method.assert_called_once_with("EUR", "RUB")
-
-
-# Демонстрация создания мок-объекта
-def test_mock_demonstration():
-    """Демонстрация создания мок-объекта"""
-    # Создаем мок-объект
+@patch('src.external_api.requests.get')
+def test_exchange_api_no_success(mock_get):
+    """Тест когда API возвращает success: false."""
     mock_response = Mock()
+    mock_response.json.return_value = {
+        "success": False,
+        "error": {"info": "Invalid API key"}
+    }
+    mock_response.raise_for_status.return_value = None
+    mock_get.return_value = mock_response
+
+    api = ExchangeRateAPI()
+    result = api.convert_currency(100.0, "USD", "RUB")
+
+    assert result is None
+    mock_get.assert_called_once()
+
+
+# ДОПОЛНИТЕЛЬНЫЕ ТЕСТЫ ДЛЯ ДЕМОНСТРАЦИИ MOCK/PATCH
+def test_simple_mock_example():
+    """Простой пример использования Mock для проверки знаний."""
+    # Создаем mock объект
+    mock_calculator = Mock()
 
     # Настраиваем его поведение
-    mock_response.status_code = 200
-    mock_response.json.return_value = {"rates": {"RUB": 75.5}}
+    mock_calculator.add.return_value = 42
+    mock_calculator.multiply.return_value = 100
 
-    # Проверяем настройки
-    assert mock_response.status_code == 200
-    assert mock_response.json() == {"rates": {"RUB": 75.5}}
+    # Используем mock
+    result1 = mock_calculator.add(10, 32)
+    result2 = mock_calculator.multiply(10, 10)
 
-    # Проверяем что метод был вызван
-    mock_response.json.assert_called_once()
+    # Проверяем результаты
+    assert result1 == 42
+    assert result2 == 100
 
-
-# Демонстрация patch как контекстного менеджера
-def test_patch_context_manager():
-    """Демонстрация использования patch как контекстного менеджера"""
-    os.environ["API_KEY"] = "test_key"
-
-    with patch('src.external_api.requests.get') as mock_get:
-        # Настраиваем мок внутри контекстного менеджера
-        mock_response = Mock()
-        mock_response.json.return_value = {"rates": {"RUB": 80.0}}
-        mock_response.raise_for_status.return_value = None
-        mock_get.return_value = mock_response
-
-        # Тестируемый код
-        api = ExchangeRateAPI()
-        result = api.get_exchange_rate("EUR")
-
-        # Проверки
-        assert result == 80.0
-        assert mock_get.called
+    # Проверяем что методы были вызваны с правильными аргументами
+    mock_calculator.add.assert_called_once_with(10, 32)
+    mock_calculator.multiply.assert_called_once_with(10, 10)
 
 
-# Демонстрация side_effect с последовательностью
-@patch('src.external_api.requests.get')
-def test_mock_side_effect_sequence(mock_get):
-    """Демонстрация side_effect с последовательностью значений"""
-    os.environ["API_KEY"] = "test_key"
+def test_mock_side_effect_example():
+    """Пример использования side_effect."""
+    mock_func = Mock()
 
-    # Создаем последовательность мок-ответов
-    mock_responses = []
-    for i in range(3):
-        mock_response = Mock()
-        mock_response.json.return_value = {"rates": {"RUB": 75.0 + i}}
-        mock_responses.append(mock_response)
+    # Настраиваем side_effect для возвращения разных значений
+    mock_func.side_effect = [1, 2, 3, StopIteration]
 
-    mock_get.side_effect = mock_responses
+    # Первые три вызова возвращают значения
+    assert mock_func() == 1
+    assert mock_func() == 2
+    assert mock_func() == 3
 
-    api = ExchangeRateAPI()
+    # Четвертый вызов вызовет StopIteration
+    with pytest.raises(StopIteration):
+        mock_func()
 
-    # Три вызова
-    results = []
-    for i in range(3):
-        result = api.get_exchange_rate("USD")
-        results.append(result)
-
-    assert results == [75.0, 76.0, 77.0]
-    assert mock_get.call_count == 3
+    assert mock_func.call_count == 4
 
 
-# Простые тесты которые точно работают
-def test_convert_rub_simple():
-    """Простой тест конвертации рублей"""
-    transaction = {"amount": "1000", "currency": "RUB"}
-    result = convert_amount_to_rub(transaction)
-    assert result == 1000.0
+def test_patch_as_context_manager():
+    """Пример использования patch как контекстного менеджера."""
+    with patch('src.external_api.ExchangeRateAPI') as MockAPI:
+        mock_instance = Mock()
+        mock_instance.convert_currency.return_value = 5000.00
+        MockAPI.return_value = mock_instance
 
+        transaction = {
+            "operationAmount": {
+                "amount": "100.00",
+                "currency": {"code": "USD"}
+            }
+        }
 
-def test_convert_invalid_amount_simple():
-    """Простой тест с некорректной суммой"""
-    transaction = {"amount": "abc", "currency": "RUB"}
-    result = convert_amount_to_rub(transaction)
-    assert result is None
+        result = convert_amount_to_rub(transaction)
 
-
-# Тест convert_amount_to_rub с моками - ПРАВИЛЬНЫЙ ВАРИАНТ
-@patch('src.external_api.ExchangeRateAPI')
-def test_convert_usd_with_mocks(MockExchangeRateAPI):
-    """Тест конвертации USD с моками"""
-    # Настраиваем mock класса
-    mock_api_instance = Mock()
-    mock_api_instance.get_exchange_rate.return_value = 75.50
-    MockExchangeRateAPI.return_value = mock_api_instance
-
-    # Тестируем
-    transaction = {"amount": "100.00", "currency": "USD"}
-    result = convert_amount_to_rub(transaction)
-
-    assert result == 7550.00
-    MockExchangeRateAPI.assert_called_once()
-    mock_api_instance.get_exchange_rate.assert_called_once_with("USD", "RUB")
+        assert result == 5000.00
+        MockAPI.assert_called_once()

@@ -3,7 +3,6 @@
 """
 
 from typing import Iterator, Dict, Any
-import json
 
 
 def filter_by_currency(transactions: list, currency: str) -> Iterator[Dict[str, Any]]:

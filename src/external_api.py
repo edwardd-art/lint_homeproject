@@ -1,5 +1,5 @@
 import os
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
 from dotenv import load_dotenv
 import requests
 
@@ -8,7 +8,7 @@ load_dotenv()
 
 
 class ExchangeRateAPI:
-    """Класс для работы с API курсов валют"""
+    """Класс для работы с API курсов валют."""
 
     def __init__(self) -> None:
         self.api_key = os.getenv("API_KEY")
@@ -21,10 +21,10 @@ class ExchangeRateAPI:
             raise ValueError("API_KEY не найден в переменных окружения")
 
     def convert_currency(
-            self,
-            amount: float,
-            from_currency: str,
-            to_currency: str = "RUB"
+        self,
+        amount: float,
+        from_currency: str,
+        to_currency: str = "RUB"
     ) -> Optional[float]:
         """
         Конвертирует сумму из одной валюты в другую.
@@ -47,24 +47,23 @@ class ExchangeRateAPI:
 
         try:
             url = f"{self.base_url}/convert"
-            headers = {"apikey": self.api_key}
-            params = {
+            headers: Dict[str, Optional[str]] = {"apikey": self.api_key}
+            params: Dict[str, Union[str, float]] = {
                 "from": from_currency,
                 "to": to_currency,
                 "amount": amount
             }
 
             response = requests.get(url, headers=headers, params=params, timeout=10)
-            response.raise_for_status()  # Проверяем статус ответа
+            response.raise_for_status()
 
-            data = response.json()
+            data: Dict[str, Any] = response.json()
 
-            # Проверяем успешность запроса
             if not data.get("success", False):
-                print(f"API вернуло ошибку: {data.get('error', {}).get('info', 'Unknown error')}")
+                error_info = data.get('error', {}).get('info', 'Unknown error')
+                print(f"API вернуло ошибку: {error_info}")
                 return None
 
-            # Получаем результат конвертации
             result = data.get("result")
             if result is None:
                 print("Результат конвертации не найден в ответе API")
@@ -91,52 +90,43 @@ def convert_amount_to_rub(transaction: Dict[str, Any]) -> Optional[float]:
         Сумма в рублях как float или None в случае ошибки
     """
     try:
-        # Проверяем структуру транзакции
         if "operationAmount" not in transaction:
             print("Транзакция не содержит поле 'operationAmount'")
             return None
 
-        operation_amount = transaction["operationAmount"]
+        operation_amount: Dict[str, Any] = transaction["operationAmount"]
 
-        # Получаем сумму
         if "amount" not in operation_amount:
             print("Транзакция не содержит поле 'amount'")
             return None
 
-        # Получаем валюту
         if "currency" not in operation_amount:
             print("Транзакция не содержит поле 'currency'")
             return None
 
-        currency_info = operation_amount["currency"]
+        currency_info: Dict[str, Any] = operation_amount["currency"]
 
         if "code" not in currency_info:
             print("Информация о валюте не содержит поле 'code'")
             return None
 
-        # Получаем сумму и код валюты
-        amount_str = operation_amount["amount"]
-        currency_code = currency_info["code"]
+        amount_str: Any = operation_amount["amount"]
+        currency_code: Any = currency_info["code"]
 
-        # Преобразуем сумму в float
         try:
             amount = float(amount_str)
         except (ValueError, TypeError):
             print(f"Некорректное значение суммы: {amount_str}")
             return None
 
-        # Приводим код валюты к верхнему регистру
         currency = str(currency_code).upper()
 
-        # Если валюта уже рубли
         if currency == "RUB":
             return float(amount)
 
-        # Для других валют конвертируем через API
         try:
             api = ExchangeRateAPI()
             converted_amount = api.convert_currency(amount, currency, "RUB")
-
             return converted_amount
 
         except ValueError as e:
