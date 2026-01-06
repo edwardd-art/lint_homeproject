@@ -1,4 +1,4 @@
-from generators import filter_by_currency, transaction_descriptions, card_number_generator
+from src.generators import filter_by_currency, transaction_descriptions, card_number_generator
 import sys
 import os
 import pytest
