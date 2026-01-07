@@ -2,7 +2,8 @@
 """Основной скрипт для работы с реальными данными"""
 
 import os
-from src import read_json_file, convert_amount_to_rub
+
+from src import convert_amount_to_rub, read_json_file
 
 
 def main():

@@ -1,8 +1,10 @@
 ﻿"""Тесты для модуля external_api."""
-import pytest
 import os
-import requests
 from unittest.mock import Mock, patch
+
+import pytest
+import requests
+
 from src.external_api import ExchangeRateAPI, convert_amount_to_rub
 
 

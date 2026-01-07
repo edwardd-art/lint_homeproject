@@ -1,5 +1,6 @@
 import os
-from typing import Dict, Any, Optional, Union
+from typing import Any, Dict, Optional, Union
+
 from dotenv import load_dotenv
 import requests
 

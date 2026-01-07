@@ -2,7 +2,7 @@
 Модуль для работы с генераторами обработки финансовых данных.
 """
 
-from typing import Iterator, Dict, Any
+from typing import Any, Dict, Iterator
 
 
 def filter_by_currency(transactions: list, currency: str) -> Iterator[Dict[str, Any]]:
