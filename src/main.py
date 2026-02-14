@@ -1,9 +1,8 @@
-﻿#!/usr/bin/env python3
-"""Основной скрипт для работы с реальными данными"""
+﻿"""Основной скрипт для работы с реальными данными"""
 
 import os
 
-from mask import get_mask_account, get_mask_card_number  # ДОБАВИЛИ ИМПОРТ
+from mask import get_mask_account, get_mask_card_number
 from src import convert_amount_to_rub, read_json_file
 
 
@@ -15,7 +14,7 @@ def main():
     print(f"Загружено транзакций: {len(transactions)}")
     print("=" * 60)
 
-    # ДОБАВЛЯЕМ ТЕСТИРОВАНИЕ МАСКИРОВАНИЯ
+    # Тестирование маскирования
     print("\n🔐 Тестирование маскирования:")
     test_card = "1234567890123456"
     masked_card = get_mask_card_number(test_card)
@@ -32,15 +31,14 @@ def main():
         print(f"  ID: {transaction.get('id', 'N/A')}")
         print(f"  Описание: {transaction.get('description', 'N/A')}")
 
-        # ДОБАВЛЯЕМ МАСКИРОВАНИЕ НОМЕРОВ КАРТ И СЧЕТОВ ИЗ ТРАНЗАКЦИЙ
+        # Маскирование номеров карт и счетов из транзакций
         from_field = transaction.get('from', '')
         to_field = transaction.get('to', '')
 
         if from_field:
-            # Пробуем извлечь номер карты/счета и замаскировать
             words = from_field.split()
-            if words and words[-1].isdigit():
-                number = words[-1]
+            if words and words[-1].replace(' ', '').isdigit():
+                number = words[-1].replace(' ', '')
                 if len(number) == 16:  # Это карта
                     masked_number = get_mask_card_number(number)
                     from_field = ' '.join(words[:-1] + [masked_number])
@@ -56,8 +54,8 @@ def main():
 
         if to_field:
             words = to_field.split()
-            if words and words[-1].isdigit():
-                number = words[-1]
+            if words and words[-1].replace(' ', '').isdigit():
+                number = words[-1].replace(' ', '')
                 if len(number) == 16:  # Это карта
                     masked_number = get_mask_card_number(number)
                     to_field = ' '.join(words[:-1] + [masked_number])
