@@ -1,17 +1,90 @@
 ﻿"""Основной скрипт для работы с реальными данными"""
 
 import os
+import argparse
+from typing import Dict, Any  # Добавь импорт
 
-from mask import get_mask_account, get_mask_card_number
-from src import convert_amount_to_rub, read_json_file
+from src.mask import get_mask_account, get_mask_card_number
+from src.utils import read_transactions
 
 
-def main():
-    # Читаем транзакции
-    file_path = os.path.join("../data", "operations.json")
-    transactions = read_json_file(file_path)
+def print_transaction_details(transaction: Dict[str, Any], index: int) -> None:
+    """Выводит детали транзакции"""
+    print(f"\n📝 Транзакция #{index}:")
+    print(f"  ID: {transaction.get('id', transaction.get('ID', 'N/A'))}")
+    print(f"  Описание: {transaction.get('description', transaction.get('Описание', 'N/A'))}")
 
-    print(f"Загружено транзакций: {len(transactions)}")
+    # Маскирование номеров карт и счетов из транзакций
+    from_field = transaction.get('from', transaction.get('Откуда', ''))
+    to_field = transaction.get('to', transaction.get('Куда', ''))
+
+    if from_field:
+        words = str(from_field).split()
+        if words and words[-1].replace(' ', '').isdigit():
+            number = words[-1].replace(' ', '')
+            if len(number) == 16:  # Это карта
+                masked_number = get_mask_card_number(number)
+                from_field = ' '.join(words[:-1] + [masked_number])
+                print(f"  Откуда: {from_field}")
+            elif len(number) > 16:  # Это счет
+                masked_number = get_mask_account(number)
+                from_field = ' '.join(words[:-1] + [masked_number])
+                print(f"  Откуда: {from_field}")
+        else:
+            print(f"  Откуда: {from_field}")
+    else:
+        print("  Откуда: Не указано")
+
+    if to_field:
+        words = str(to_field).split()
+        if words and words[-1].replace(' ', '').isdigit():
+            number = words[-1].replace(' ', '')
+            if len(number) == 16:  # Это карта
+                masked_number = get_mask_card_number(number)
+                to_field = ' '.join(words[:-1] + [masked_number])
+                print(f"  Куда: {to_field}")
+            elif len(number) > 16:  # Это счет
+                masked_number = get_mask_account(number)
+                to_field = ' '.join(words[:-1] + [masked_number])
+                print(f"  Куда: {to_field}")
+        else:
+            print(f"  Куда: {to_field}")
+    else:
+        print("  Куда: Не указано")
+
+    # Для разных форматов могут быть разные названия полей
+    amount = transaction.get('amount', transaction.get('Сумма', 'N/A'))
+    currency = transaction.get('currency', transaction.get('Валюта', 'RUB'))
+
+    print(f"  Сумма: {amount} {currency}")
+
+
+def main() -> None:
+    """Главная функция программы"""
+    # Настройка парсера аргументов командной строки
+    parser = argparse.ArgumentParser(description='Чтение финансовых транзакций из разных форматов')
+    parser.add_argument('--file', type=str, default='operations.json',
+                        help='Имя файла с транзакциями (из папки data/)')
+    parser.add_argument('--limit', type=int, default=5,
+                        help='Количество транзакций для отображения')
+
+    args = parser.parse_args()
+
+    # Формируем путь к файлу в папке data
+    file_path = os.path.join("data", args.file)
+
+    print(f"📂 Загрузка транзакций из файла: {file_path}")
+    print("=" * 60)
+
+    # Используем универсальную функцию для чтения
+    transactions = read_transactions(file_path)
+
+    if not transactions:
+        print("❌ Не удалось загрузить транзакции. Проверьте файл.")
+        print(f"   Искали в: {os.path.abspath(file_path)}")
+        return
+
+    print(f"✅ Загружено транзакций: {len(transactions)}")
     print("=" * 60)
 
     # Тестирование маскирования
@@ -25,69 +98,18 @@ def main():
     print(f"  Счет: {masked_account}")
     print("=" * 60)
 
-    # Обрабатываем первые 5 транзакций для примера
-    for i, transaction in enumerate(transactions[:5], 1):
-        print(f"\n📝 Транзакция #{i}:")
-        print(f"  ID: {transaction.get('id', 'N/A')}")
-        print(f"  Описание: {transaction.get('description', 'N/A')}")
+    # Определяем формат файла для информации
+    file_ext = os.path.splitext(file_path)[1].lower()
+    print(f"📊 Формат файла: {file_ext}")
 
-        # Маскирование номеров карт и счетов из транзакций
-        from_field = transaction.get('from', '')
-        to_field = transaction.get('to', '')
-
-        if from_field:
-            words = from_field.split()
-            if words and words[-1].replace(' ', '').isdigit():
-                number = words[-1].replace(' ', '')
-                if len(number) == 16:  # Это карта
-                    masked_number = get_mask_card_number(number)
-                    from_field = ' '.join(words[:-1] + [masked_number])
-                    print(f"  Откуда: {from_field}")
-                elif len(number) > 16:  # Это счет
-                    masked_number = get_mask_account(number)
-                    from_field = ' '.join(words[:-1] + [masked_number])
-                    print(f"  Откуда: {from_field}")
-            else:
-                print(f"  Откуда: {from_field}")
-        else:
-            print("  Откуда: Не указано")
-
-        if to_field:
-            words = to_field.split()
-            if words and words[-1].replace(' ', '').isdigit():
-                number = words[-1].replace(' ', '')
-                if len(number) == 16:  # Это карта
-                    masked_number = get_mask_card_number(number)
-                    to_field = ' '.join(words[:-1] + [masked_number])
-                    print(f"  Куда: {to_field}")
-                elif len(number) > 16:  # Это счет
-                    masked_number = get_mask_account(number)
-                    to_field = ' '.join(words[:-1] + [masked_number])
-                    print(f"  Куда: {to_field}")
-            else:
-                print(f"  Куда: {to_field}")
-        else:
-            print("  Куда: Не указано")
-
-        operation_amount = transaction.get("operationAmount", {})
-        amount = operation_amount.get("amount", "N/A")
-        currency_info = operation_amount.get("currency", {})
-        currency_name = currency_info.get("name", "N/A")
-        currency_code = currency_info.get("code", "N/A")
-
-        print(f"  Сумма: {amount} {currency_name} ({currency_code})")
-
-        # Конвертируем
-        amount_rub = convert_amount_to_rub(transaction)
-
-        if amount_rub is not None:
-            print(f"  💰 В рублях: {amount_rub:.2f} RUB")
-        else:
-            print("  ❌ Ошибка конвертации")
+    # Обрабатываем транзакции
+    limit = min(args.limit, len(transactions))
+    for i in range(limit):
+        print_transaction_details(transactions[i], i + 1)
 
     print("\n" + "=" * 60)
     print("✅ Обработка завершена")
-    print("📁 Проверь папку 'logs' - там должны быть оба файла: mask.log и utils.log")
+    print("📁 Проверь папку 'logs' - там должны быть файлы логов")
 
 
 if __name__ == "__main__":

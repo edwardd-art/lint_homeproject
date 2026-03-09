@@ -103,3 +103,23 @@ for card_number in card_generator:
 ```bash
 git clone https://github.com/edwardd-art/lint_homeproject.git
 
+# Финансовые транзакции
+
+## Описание
+Проект для обработки финансовых транзакций из различных источников данных.
+
+## Новые возможности (v2.0)
+- ✅ Поддержка **CSV** файлов
+- ✅ Поддержка **Excel** (XLSX) файлов
+- ✅ Автоматическое определение формата по расширению
+- ✅ Универсальная функция `read_transactions()`
+- ✅ Полная типизация (mypy без ошибок)
+- ✅ Тесты для всех форматов
+
+## Установка
+
+```bash
+# Установка зависимостей
+pip install pandas openpyxl pandas-stubs
+# или через poetry
+poetry install

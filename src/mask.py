@@ -1,4 +1,4 @@
-from logger_config import setup_module_logger
+from src.logger_config import setup_module_logger
 
 # Создаем логгер для модуля mask
 logger = setup_module_logger('mask')
