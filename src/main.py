@@ -1,8 +1,8 @@
 ﻿"""Основной скрипт для работы с реальными данными"""
 
-import os
 import argparse
-from typing import Dict, Any  # Добавь импорт
+import os
+from typing import Any, Dict  # Добавь импорт
 
 from src.mask import get_mask_account, get_mask_card_number
 from src.utils import read_transactions

@@ -1,7 +1,9 @@
-import pandas as pd
 import json
 import os
 from typing import Any, Dict, List, cast
+
+import pandas as pd
+
 from src.logger_config import setup_module_logger
 
 logger = setup_module_logger('utils')
@@ -132,6 +134,7 @@ def read_transactions(file_path: str) -> List[Dict[str, Any]]:
         logger.error(f"Неподдерживаемый формат файла: {file_extension}")
         return []
 
+
 def convert_amount_to_rub(transaction: Dict[str, Any]) -> float | None:
     """
     Конвертирует сумму транзакции в рубли.
@@ -140,7 +143,7 @@ def convert_amount_to_rub(transaction: Dict[str, Any]) -> float | None:
     try:
         # Здесь должна быть реальная логика конвертации
         # Пока возвращаем заглушку
-        logger.info(f"Конвертация транзакции в рубли (заглушка)")
+        logger.info("Конвертация транзакции в рубли (заглушка)")
         return 0.0
     except Exception as e:
         logger.error(f"Ошибка конвертации: {e}")
