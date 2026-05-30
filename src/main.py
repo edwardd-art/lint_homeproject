@@ -1,206 +1,112 @@
-﻿"""Основной скрипт для работы с реальными данными"""
-
-import os
+﻿# src/main.py (начало файла)
 import sys
-from typing import Any, Dict, List
+import os
 
-# Добавляем текущую папку в путь поиска модулей
-sys.path.insert(0, os.path.dirname(__file__))
+# Добавляем корневую папку в путь
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from mask import get_mask_account, get_mask_card_number
-from utils import (
-    read_transactions,
-    search_transactions,
-    count_transactions_by_category
+import json
+from datetime import datetime
+
+import pandas as pd
+
+from .reports import spending_by_category, spending_by_day_of_week, spending_by_workday
+from .services import (
+    search_phone_numbers,
+    search_transactions_service,
+    search_transfers_to_individuals,
 )
+from .views import main_views
 
 
-def print_transaction_details(transaction: Dict[str, Any], index: int) -> None:
-    """Выводит детали транзакции"""
-    print(f"\n📝 Транзакция #{index}:")
-    print(f"  ID: {transaction.get('id', 'N/A')}")
-    print(f"  Описание: {transaction.get('description', 'N/A')}")
+def load_transactions() -> pd.DataFrame:
+    """Загружает транзакции из Excel файла."""
+    # Пробуем .xlsx
+    file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'operations.xlsx')
 
-    # Маскирование номеров карт и счетов из транзакций
-    from_field = transaction.get('from', '')
-    to_field = transaction.get('to', '')
+    # Если не найден, пробуем .xls
+    if not os.path.exists(file_path):
+        file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'operations.xls')
 
-    if from_field:
-        words = str(from_field).split()
-        if words and words[-1].replace(' ', '').isdigit():
-            number = words[-1].replace(' ', '')
-            if len(number) == 16:
-                masked_number = get_mask_card_number(number)
-                from_field = ' '.join(words[:-1] + [masked_number])
-                print(f"  Откуда: {from_field}")
-            elif len(number) > 16:
-                masked_number = get_mask_account(number)
-                from_field = ' '.join(words[:-1] + [masked_number])
-                print(f"  Откуда: {from_field}")
-        else:
-            print(f"  Откуда: {from_field}")
-    else:
-        print("  Откуда: Не указано")
+    print(f"📂 Загрузка файла: {file_path}")
+    print(f"📁 Файл существует: {os.path.exists(file_path)}")
 
-    if to_field:
-        words = str(to_field).split()
-        if words and words[-1].replace(' ', '').isdigit():
-            number = words[-1].replace(' ', '')
-            if len(number) == 16:
-                masked_number = get_mask_card_number(number)
-                to_field = ' '.join(words[:-1] + [masked_number])
-                print(f"  Куда: {to_field}")
-            elif len(number) > 16:
-                masked_number = get_mask_account(number)
-                to_field = ' '.join(words[:-1] + [masked_number])
-                print(f"  Куда: {to_field}")
-        else:
-            print(f"  Куда: {to_field}")
-    else:
-        print("  Куда: Не указано")
+    df = pd.read_excel(file_path)
 
-    amount = transaction.get('amount', 'N/A')
-    currency_name = transaction.get('currency_name', transaction.get('currency', 'RUB'))
+    df.columns = [col.lower().strip().replace(' ', '_') for col in df.columns]
 
-    print(f"  Сумма: {amount} {currency_name}")
+    # ДИАГНОСТИКА
+    print("=" * 60)
+    print("🔍 НАЙДЕНЫ КОЛОНКИ В EXCEL:")
+    for i, col in enumerate(df.columns, 1):
+        print(f"   {i}. '{col}'")
+    print("=" * 60)
+
+    return df
 
 
-def filter_by_status(transactions: List[Dict[str, Any]], status: str) -> List[Dict[str, Any]]:
-    """Фильтрует транзакции по статусу (без учета регистра)"""
-    return [
-        t for t in transactions
-        if isinstance(t.get('state', ''), str) and t.get('state', '').lower() == status.lower()
-    ]
+def main():
+    """Главная функция для демонстрации работы всех модулей."""
+    print("=" * 60)
+    print("КУРСОВАЯ РАБОТА: Анализ банковских транзакций")
+    print("=" * 60)
 
+    # Загружаем данные
+    df = load_transactions()
+    print(f"✅ Загружено транзакций: {len(df)}")
 
-def sort_by_date(transactions: List[Dict[str, Any]], ascending: bool = True) -> List[Dict[str, Any]]:
-    """Сортирует транзакции по дате"""
-    return sorted(
-        transactions,
-        key=lambda x: x.get('date', ''),
-        reverse=not ascending
-    )
+    # Показываем первые 2 строки для примера
+    print("\n📊 ПЕРВЫЕ 2 ТРАНЗАКЦИИ:")
+    print(df.head(2).to_string())
+    print("=" * 60)
 
+    # 1. Главная страница
+    print("\n" + "=" * 60)
+    print("1. ГЛАВНАЯ СТРАНИЦА")
+    print("=" * 60)
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    views_result = main_views(current_time, df)
+    print(json.dumps(json.loads(views_result), indent=2, ensure_ascii=False)[:1000] + "...")
 
-def filter_rub_transactions(transactions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Фильтрует только рублевые транзакции"""
-    return [t for t in transactions if t.get('currency') == 'RUB']
+    # 2. Поиск по телефонным номерам
+    print("\n" + "=" * 60)
+    print("2. ПОИСК ПО ТЕЛЕФОННЫМ НОМЕРАМ")
+    print("=" * 60)
+    phone_result = search_phone_numbers(df.to_dict('records'))
+    print(phone_result[:500] + "..." if len(phone_result) > 500 else phone_result)
 
+    # 3. Поиск переводов физлицам
+    print("\n" + "=" * 60)
+    print("3. ПОИСК ПЕРЕВОДОВ ФИЗИЧЕСКИМ ЛИЦАМ")
+    print("=" * 60)
+    transfers_result = search_transfers_to_individuals(df.to_dict('records'))
+    print(transfers_result[:500] + "..." if len(transfers_result) > 500 else transfers_result)
 
-def get_user_choice(prompt: str, options: List[str]) -> str:
-    """Получает выбор пользователя из списка вариантов"""
-    while True:
-        choice = input(prompt).strip()
-        if choice.lower() in [opt.lower() for opt in options]:
-            return choice
-        print(f"Некорректный ввод. Доступные варианты: {', '.join(options)}")
+    # 4. Отчет: траты по категории
+    print("\n" + "=" * 60)
+    print("4. ОТЧЕТ: ТРАТЫ ПО КАТЕГОРИИ 'Супермаркеты'")
+    print("=" * 60)
+    category_result = spending_by_category(df, "Супермаркеты")
+    print(category_result)
 
+    # 5. Отчет: траты по дням недели
+    print("\n" + "=" * 60)
+    print("5. ОТЧЕТ: ТРАТЫ ПО ДНЯМ НЕДЕЛИ")
+    print("=" * 60)
+    weekday_result = spending_by_day_of_week(df)
+    print(weekday_result)
 
-def get_yes_no(prompt: str) -> bool:
-    """Получает ответ Да/Нет от пользователя"""
-    while True:
-        choice = input(prompt + " (да/нет): ").strip().lower()
-        if choice in ['да', 'yes', 'y', 'д']:
-            return True
-        if choice in ['нет', 'no', 'n']:
-            return False
-        print("Пожалуйста, ответьте 'да' или 'нет'")
+    # 6. Отчет: траты в рабочие/выходные дни
+    print("\n" + "=" * 60)
+    print("6. ОТЧЕТ: ТРАТЫ В РАБОЧИЕ И ВЫХОДНЫЕ ДНИ")
+    print("=" * 60)
+    workday_result = spending_by_workday(df)
+    print(workday_result)
 
-
-def main() -> None:
-    """Главная функция программы"""
-    print("Привет! Добро пожаловать в программу работы с банковскими транзакциями.")
-
-    # Выбор источника данных
-    print("\nВыберите необходимый пункт меню:")
-    print("1. Получить информацию о транзакциях из JSON-файла")
-    print("2. Получить информацию о транзакциях из CSV-файла")
-    print("3. Получить информацию о транзакциях из XLSX-файла")
-
-    file_choice = get_user_choice("Ваш выбор: ", ["1", "2", "3"])
-
-    file_map = {
-        "1": ("operations.json", "JSON"),
-        "2": ("transactions.csv", "CSV"),
-        "3": ("transactions_excel.xlsx", "XLSX")
-    }
-
-    file_name, file_type = file_map[file_choice]
-    file_path = os.path.join("data", file_name)
-
-    print(f"\nДля обработки выбран {file_type}-файл.")
-
-    # Загрузка транзакций
-    transactions = read_transactions(file_path)
-
-    if not transactions:
-        print("Не удалось загрузить транзакции. Проверьте наличие файла.")
-        return
-
-    # Фильтрация по статусу
-    available_statuses = ["EXECUTED", "CANCELED", "PENDING"]
-    filtered_transactions = None
-
-    while True:
-        status_input = input(
-            f"\nВведите статус, по которому необходимо выполнить фильтрацию.\n"
-            f"Доступные статусы: {', '.join(available_statuses)}\n"
-        ).strip()
-
-        if status_input.upper() in [s.upper() for s in available_statuses]:
-            filtered_transactions = filter_by_status(transactions, status_input)
-            print(f"Операции отфильтрованы по статусу \"{status_input.upper()}\"")
-            break
-        else:
-            print(f"Статус операции \"{status_input}\" недоступен.")
-
-    if not filtered_transactions:
-        print("\nНе найдено ни одной транзакции, подходящей под ваши условия фильтрации")
-        return
-
-    transactions_to_process = filtered_transactions
-
-    # Сортировка по дате
-    if get_yes_no("\nОтсортировать операции по дате?"):
-        order = get_user_choice("Отсортировать по возрастанию или по убыванию? ", ["по возрастанию", "по убыванию"])
-        ascending = order.lower() == "по возрастанию"
-        transactions_to_process = sort_by_date(transactions_to_process, ascending)
-        print(f"Операции отсортированы по дате ({order})")
-
-    # Фильтрация по рублевым транзакциям
-    if get_yes_no("\nВыводить только рублевые транзакции?"):
-        transactions_to_process = filter_rub_transactions(transactions_to_process)
-        if not transactions_to_process:
-            print("\nНе найдено ни одной рублевой транзакции, подходящей под ваши условия фильтрации")
-            return
-
-    # Поиск по описанию
-    if get_yes_no("\nОтфильтровать список транзакций по определенному слову в описании?"):
-        search_word = input("Введите слово для поиска: ").strip()
-        if search_word:
-            transactions_to_process = search_transactions(transactions_to_process, search_word)
-            if not transactions_to_process:
-                print("\nНе найдено ни одной транзакции, подходящей под ваши условия фильтрации")
-                return
-
-    # Вывод результатов
-    print("\nРаспечатываю итоговый список транзакций...")
-    print(f"\nВсего банковских операций в выборке: {len(transactions_to_process)}")
-
-    for i, transaction in enumerate(transactions_to_process, 1):
-        print_transaction_details(transaction, i)
-
-    # Подсчет по категориям
-    categories = ["Перевод", "Оплата", "Покупка", "Снятие"]
-    category_counts = count_transactions_by_category(transactions_to_process, categories)
-
-    if category_counts and any(count > 0 for count in category_counts.values()):
-        print("\n📊 Статистика по категориям:")
-        for category, count in category_counts.items():
-            if count > 0:
-                print(f"  {category}: {count} операций")
-    else:
-        print("\n📊 Нет операций для подсчета статистики по категориям")
+    print("\n" + "=" * 60)
+    print("✅ Все модули успешно выполнены!")
+    print("📁 Логи записаны в файл reports.log")
+    print("=" * 60)
 
 
 if __name__ == "__main__":

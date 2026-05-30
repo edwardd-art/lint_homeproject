@@ -1,3 +1,4 @@
+# src/utils.py
 import json
 import os
 import re
@@ -6,7 +7,7 @@ from typing import Any, Dict, List, cast
 
 import pandas as pd
 
-from logger_config import setup_module_logger
+from .logger_config import setup_module_logger
 
 logger = setup_module_logger('utils')
 

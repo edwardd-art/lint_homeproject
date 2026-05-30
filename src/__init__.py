@@ -1,9 +1,9 @@
 """Пакет с модулями для обработки финансовых транзакций"""
 
-from decorators import log
-from external_api import ExchangeRateAPI
-from mask import get_mask_account, get_mask_card_number
-from utils import (
+from .decorators import log
+from .external_api import ExchangeRateAPI
+from .mask import get_mask_account, get_mask_card_number
+from .utils import (
     convert_amount_to_rub,
     count_transactions_by_category,
     read_csv_file,
