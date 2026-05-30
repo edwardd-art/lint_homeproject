@@ -1,5 +1,7 @@
 import json
 import os
+import re  # Добавляем импорт re для регулярных выражений
+from collections import Counter  # Добавляем Counter для подсчета категорий
 from typing import Any, Dict, List, cast
 
 import pandas as pd
@@ -141,10 +143,82 @@ def convert_amount_to_rub(transaction: Dict[str, Any]) -> float | None:
     Временная заглушка для совместимости.
     """
     try:
-        # Здесь должна быть реальная логика конвертации
-        # Пока возвращаем заглушку
         logger.info("Конвертация транзакции в рубли (заглушка)")
         return 0.0
     except Exception as e:
         logger.error(f"Ошибка конвертации: {e}")
         return None
+
+
+# ========== НОВЫЕ ФУНКЦИИ ДЛЯ ЗАДАНИЯ ==========
+
+def search_transactions(transactions: List[Dict[str, Any]], search_string: str) -> List[Dict[str, Any]]:
+    """
+    Ищет транзакции по строке в описании с использованием регулярных выражений.
+
+    Args:
+        transactions: Список словарей с транзакциями
+        search_string: Строка для поиска в описании
+
+    Returns:
+        Список транзакций, содержащих строку поиска в описании
+    """
+    if not transactions:
+        logger.info("Пустой список транзакций для поиска")
+        return []
+
+    if not search_string:
+        logger.warning("Пустая строка поиска")
+        return transactions
+
+    try:
+        pattern = re.compile(re.escape(search_string), re.IGNORECASE)
+        result = [
+            t for t in transactions
+            if pattern.search(str(t.get('description', '')))
+        ]
+        logger.info(f"Найдено {len(result)} транзакций по запросу '{search_string}'")
+        return result
+    except re.error as e:
+        logger.error(f"Ошибка регулярного выражения: {e}")
+        return []
+
+
+def count_transactions_by_category(transactions: List[Dict[str, Any]], categories: List[str]) -> Dict[str, int]:
+    """
+    Подсчитывает количество транзакций по категориям.
+
+    Args:
+        transactions: Список словарей с транзакциями
+        categories: Список категорий для подсчета
+
+    Returns:
+        Словарь с количеством транзакций по каждой категории
+    """
+    if not transactions:
+        logger.info("Пустой список транзакций для подсчета")
+        return {category: 0 for category in categories}
+
+    if not categories:
+        logger.warning("Пустой список категорий")
+        return {}
+
+    try:
+        category_counter = Counter()
+        for transaction in transactions:
+            description = str(transaction.get('description', ''))
+            for category in categories:
+                if category.lower() in description.lower():
+                    category_counter[category] += 1
+                    break
+
+        result = dict(category_counter)
+        for category in categories:
+            if category not in result:
+                result[category] = 0
+
+        logger.info(f"Подсчитаны категории: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"Ошибка при подсчете категорий: {e}")
+        return {category: 0 for category in categories}
