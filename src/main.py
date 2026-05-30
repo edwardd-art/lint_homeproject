@@ -1,10 +1,14 @@
 ﻿"""Основной скрипт для работы с реальными данными"""
 
 import os
-from typing import Any, Dict, List, Optional
+import sys
+from typing import Any, Dict, List
 
-from src.mask import get_mask_account, get_mask_card_number
-from src.utils import (
+# Добавляем текущую папку в путь поиска модулей
+sys.path.insert(0, os.path.dirname(__file__))
+
+from mask import get_mask_account, get_mask_card_number
+from utils import (
     read_transactions,
     search_transactions,
     count_transactions_by_category
@@ -14,12 +18,12 @@ from src.utils import (
 def print_transaction_details(transaction: Dict[str, Any], index: int) -> None:
     """Выводит детали транзакции"""
     print(f"\n📝 Транзакция #{index}:")
-    print(f"  ID: {transaction.get('id', transaction.get('ID', 'N/A'))}")
-    print(f"  Описание: {transaction.get('description', transaction.get('Описание', 'N/A'))}")
+    print(f"  ID: {transaction.get('id', 'N/A')}")
+    print(f"  Описание: {transaction.get('description', 'N/A')}")
 
     # Маскирование номеров карт и счетов из транзакций
-    from_field = transaction.get('from', transaction.get('Откуда', ''))
-    to_field = transaction.get('to', transaction.get('Куда', ''))
+    from_field = transaction.get('from', '')
+    to_field = transaction.get('to', '')
 
     if from_field:
         words = str(from_field).split()
@@ -55,15 +59,18 @@ def print_transaction_details(transaction: Dict[str, Any], index: int) -> None:
     else:
         print("  Куда: Не указано")
 
-    amount = transaction.get('amount', transaction.get('Сумма', 'N/A'))
-    currency = transaction.get('currency', transaction.get('Валюта', 'RUB'))
+    amount = transaction.get('amount', 'N/A')
+    currency_name = transaction.get('currency_name', transaction.get('currency', 'RUB'))
 
-    print(f"  Сумма: {amount} {currency}")
+    print(f"  Сумма: {amount} {currency_name}")
 
 
 def filter_by_status(transactions: List[Dict[str, Any]], status: str) -> List[Dict[str, Any]]:
     """Фильтрует транзакции по статусу (без учета регистра)"""
-    return [t for t in transactions if t.get('state', '').lower() == status.lower()]
+    return [
+        t for t in transactions
+        if isinstance(t.get('state', ''), str) and t.get('state', '').lower() == status.lower()
+    ]
 
 
 def sort_by_date(transactions: List[Dict[str, Any]], ascending: bool = True) -> List[Dict[str, Any]]:

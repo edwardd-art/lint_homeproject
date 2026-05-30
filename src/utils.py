@@ -1,65 +1,95 @@
 import json
 import os
-import re  # Добавляем импорт re для регулярных выражений
-from collections import Counter  # Добавляем Counter для подсчета категорий
+import re
+from collections import Counter
 from typing import Any, Dict, List, cast
 
 import pandas as pd
 
-from src.logger_config import setup_module_logger
+from logger_config import setup_module_logger
 
 logger = setup_module_logger('utils')
 
 
+def normalize_transaction(transaction: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Приводит транзакции из разных форматов (JSON, CSV, Excel) к единому виду.
+
+    Args:
+        transaction: Сырая транзакция из файла
+
+    Returns:
+        Нормализованная транзакция с единой структурой
+    """
+    normalized = {}
+
+    # Базовые поля
+    normalized['id'] = transaction.get('id')
+    normalized['state'] = transaction.get('state', '')
+    normalized['date'] = transaction.get('date', '')
+    normalized['description'] = transaction.get('description', '')
+    normalized['from'] = transaction.get('from', '')
+    normalized['to'] = transaction.get('to', '')
+
+    # Универсальное получение суммы и валюты
+    # Проверяем, есть ли вложенная структура operationAmount (как в JSON)
+    if 'operationAmount' in transaction and isinstance(transaction['operationAmount'], dict):
+        # JSON формат
+        op_amount = transaction['operationAmount']
+        normalized['amount'] = op_amount.get('amount', '')
+        if 'currency' in op_amount and isinstance(op_amount['currency'], dict):
+            normalized['currency'] = op_amount['currency'].get('code', '')
+            normalized['currency_name'] = op_amount['currency'].get('name', '')
+        else:
+            normalized['currency'] = ''
+            normalized['currency_name'] = ''
+    else:
+        # CSV/Excel формат
+        normalized['amount'] = transaction.get('amount', transaction.get('Сумма', ''))
+        normalized['currency'] = transaction.get('currency', transaction.get('currency_code', ''))
+        normalized['currency_name'] = transaction.get('currency_name', transaction.get('Валюта', ''))
+
+    return normalized
+
+
 def read_json_file(file_path: str) -> List[Dict[str, Any]]:
     """
-    Читает JSON-файл и возвращает список транзакций.
+    Читает JSON-файл и возвращает список нормализованных транзакций.
     """
     try:
         logger.info(f"Начало чтения JSON-файла: {file_path}")
 
         if not os.path.exists(file_path):
             logger.error(f"Файл {file_path} не найден")
-            print(f"Файл {file_path} не найден")
             return []
 
         if os.path.getsize(file_path) == 0:
             logger.warning(f"Файл {file_path} пустой")
-            print(f"Файл {file_path} пустой")
             return []
 
         with open(file_path, 'r', encoding='utf-8') as file:
             data = json.load(file)
-        logger.info(f"Файл успешно прочитан, получен тип данных: {type(data)}")
 
         if not isinstance(data, list):
-            logger.error(f"Файл {file_path} должен содержать список, получен тип {type(data)}")
-            print(f"Файл {file_path} должен содержать список")
+            logger.error(f"Файл {file_path} должен содержать список")
             return []
 
         valid_transactions = [item for item in data if isinstance(item, dict) and item]
-        logger.info(f"Найдено {len(valid_transactions)} валидных транзакций из {len(data)} записей")
-        print(f"Найдено транзакций: {len(valid_transactions)}")
 
-        return valid_transactions
+        # Нормализуем каждую транзакцию
+        normalized_transactions = [normalize_transaction(t) for t in valid_transactions]
 
-    except FileNotFoundError:
-        logger.error(f"Файл {file_path} не найден (FileNotFoundError)")
-        print(f"Файл {file_path} не найден (FileNotFoundError)")
-        return []
-    except json.JSONDecodeError as e:
-        logger.error(f"Ошибка декодирования JSON в файле {file_path}: {e}")
-        print(f"Ошибка декодирования JSON в файле {file_path}: {e}")
-        return []
+        logger.info(f"Найдено {len(normalized_transactions)} валидных транзакций")
+        return normalized_transactions
+
     except Exception as e:
-        logger.error(f"Неожиданная ошибка при чтении файла {file_path}: {e}")
-        print(f"Неожиданная ошибка при чтении файла {file_path}: {e}")
+        logger.error(f"Ошибка при чтении JSON: {e}")
         return []
 
 
 def read_csv_file(file_path: str) -> List[Dict[str, Any]]:
     """
-    Читает CSV-файл и возвращает список транзакций.
+    Читает CSV-файл и возвращает список нормализованных транзакций.
     """
     try:
         logger.info(f"Начало чтения CSV-файла: {file_path}")
@@ -68,20 +98,35 @@ def read_csv_file(file_path: str) -> List[Dict[str, Any]]:
             logger.error(f"Файл {file_path} не найден")
             return []
 
-        df = pd.read_csv(file_path)
+        # Пробуем разные разделители
+        separators = [',', ';', '\t', '|']
+        df = None
+
+        for sep in separators:
+            try:
+                df = pd.read_csv(file_path, sep=sep, encoding='utf-8')
+                if len(df.columns) > 1:
+                    break
+            except:
+                continue
+
+        if df is None or len(df.columns) == 1:
+            # Если не удалось определить разделитель, читаем с автоопределением
+            df = pd.read_csv(file_path, sep=None, engine='python', encoding='utf-8')
+
         logger.info(f"CSV файл прочитан. Всего записей: {len(df)}")
+
+        # Приводим названия колонок к единому формату (нижний регистр)
+        df.columns = [col.lower().strip() for col in df.columns]
 
         transactions = cast(List[Dict[str, Any]], df.to_dict(orient='records'))
 
-        logger.info(f"Успешно загружено {len(transactions)} транзакций из CSV")
-        return transactions
+        # Нормализуем каждую транзакцию
+        normalized_transactions = [normalize_transaction(t) for t in transactions]
 
-    except pd.errors.EmptyDataError:
-        logger.error(f"CSV файл {file_path} пустой")
-        return []
-    except pd.errors.ParserError as e:
-        logger.error(f"Ошибка парсинга CSV: {e}")
-        return []
+        logger.info(f"Успешно загружено {len(normalized_transactions)} транзакций из CSV")
+        return normalized_transactions
+
     except Exception as e:
         logger.error(f"Неожиданная ошибка при чтении CSV: {e}")
         return []
@@ -89,7 +134,7 @@ def read_csv_file(file_path: str) -> List[Dict[str, Any]]:
 
 def read_excel_file(file_path: str) -> List[Dict[str, Any]]:
     """
-    Читает Excel-файл и возвращает список транзакций.
+    Читает Excel-файл и возвращает список нормализованных транзакций.
     """
     try:
         logger.info(f"Начало чтения Excel-файла: {file_path}")
@@ -101,14 +146,17 @@ def read_excel_file(file_path: str) -> List[Dict[str, Any]]:
         df = pd.read_excel(file_path)
         logger.info(f"Excel файл прочитан. Всего записей: {len(df)}")
 
+        # Приводим названия колонок к единому формату (нижний регистр)
+        df.columns = [col.lower().strip() for col in df.columns]
+
         transactions = cast(List[Dict[str, Any]], df.to_dict(orient='records'))
 
-        logger.info(f"Успешно загружено {len(transactions)} транзакций из Excel")
-        return transactions
+        # Нормализуем каждую транзакцию
+        normalized_transactions = [normalize_transaction(t) for t in transactions]
 
-    except pd.errors.EmptyDataError:
-        logger.error(f"Excel файл {file_path} пустой")
-        return []
+        logger.info(f"Успешно загружено {len(normalized_transactions)} транзакций из Excel")
+        return normalized_transactions
+
     except Exception as e:
         logger.error(f"Неожиданная ошибка при чтении Excel: {e}")
         return []
@@ -150,18 +198,9 @@ def convert_amount_to_rub(transaction: Dict[str, Any]) -> float | None:
         return None
 
 
-# ========== НОВЫЕ ФУНКЦИИ ДЛЯ ЗАДАНИЯ ==========
-
 def search_transactions(transactions: List[Dict[str, Any]], search_string: str) -> List[Dict[str, Any]]:
     """
     Ищет транзакции по строке в описании с использованием регулярных выражений.
-
-    Args:
-        transactions: Список словарей с транзакциями
-        search_string: Строка для поиска в описании
-
-    Returns:
-        Список транзакций, содержащих строку поиска в описании
     """
     if not transactions:
         logger.info("Пустой список транзакций для поиска")
@@ -187,13 +226,6 @@ def search_transactions(transactions: List[Dict[str, Any]], search_string: str) 
 def count_transactions_by_category(transactions: List[Dict[str, Any]], categories: List[str]) -> Dict[str, int]:
     """
     Подсчитывает количество транзакций по категориям.
-
-    Args:
-        transactions: Список словарей с транзакциями
-        categories: Список категорий для подсчета
-
-    Returns:
-        Словарь с количеством транзакций по каждой категории
     """
     if not transactions:
         logger.info("Пустой список транзакций для подсчета")
